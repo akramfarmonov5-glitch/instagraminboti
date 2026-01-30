@@ -43,20 +43,36 @@ class InstagramClient:
     def login(self) -> bool:
         """
         Session-first login strategy.
-        Tries to load existing session, falls back to password login.
+        Checks Database, then File, finally Password.
         """
-        # Try session first
+        from database.models import get_stored_session, save_stored_session
+        
+        # 1. Try Loading from Database (Highest priority for Cloud Sync)
+        db_session = get_stored_session()
+        if db_session:
+            print("📦 Found session in database, attempting to load...")
+            try:
+                session_data = json.loads(db_session)
+                self.client.set_settings(session_data)
+                self.logged_in = True
+                print(f"✅ Database session valid for ID: {self.client.user_id}")
+                return True
+            except Exception as e:
+                print(f"⚠️ Database session invalid: {e}")
+
+        # 2. Try loading from Local File
         if self._load_session():
-            print("✅ Loaded existing session")
+            print("✅ Loaded existing session from file")
+            self._save_session() # Sync to DB immediately
             self.logged_in = True
             return True
         
-        # Fall back to password login
+        # 3. Fall back to password login
         print("🔑 Logging in with password...")
         try:
             self.client.login(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD)
             self._save_session()
-            print("✅ Login successful, session saved")
+            print("✅ Login successful, session synced")
             self.logged_in = True
             return True
         except ChallengeRequired as e:
@@ -73,41 +89,28 @@ class InstagramClient:
             return False
         
         try:
-            # First try loading as instagrapi format
             self.client.load_settings(SESSION_FILE)
-            # Set user_id from settings
-            if hasattr(self.client, 'user_id') and self.client.user_id:
-                print(f"✅ Session loaded for user ID: {self.client.user_id}")
+            if self.client.user_id:
                 return True
-        except Exception as e:
-            print(f"⚠️ Standard session load failed: {e}")
-        
-        # Try loading session ID directly
-        try:
-            import json
-            with open(SESSION_FILE, 'r') as f:
-                data = json.load(f)
-            
-            session_id = data.get('cookies', {}).get('sessionid') or data.get('authorization_data', {}).get('sessionid')
-            
-            if session_id:
-                from urllib.parse import unquote
-                session_id = unquote(session_id)
-                
-                # Load settings first then set session
-                self.client.load_settings(SESSION_FILE)
-                self.client.user_id = data.get('cookies', {}).get('ds_user_id') or data.get('authorization_data', {}).get('ds_user_id')
-                
-                print(f"✅ Session loaded via session ID for user: {self.client.user_id}")
-                return True
-        except Exception as e:
-            print(f"⚠️ Session ID load failed: {e}")
-        
+        except:
+            pass
         return False
     
     def _save_session(self):
-        """Save session to file"""
-        self.client.dump_settings(SESSION_FILE)
+        """Save session to file AND database"""
+        from database.models import save_stored_session
+        # Save to file
+        try:
+            self.client.dump_settings(SESSION_FILE)
+        except Exception as e:
+            print(f"⚠️ Could not save session to file: {e}")
+            
+        # Save to database (JSON string)
+        try:
+            session_data = self.client.get_settings()
+            save_stored_session(json.dumps(session_data))
+        except Exception as e:
+            print(f"⚠️ Could not sync session to database: {e}")
     
     def get_user_info(self, username: str) -> Optional[dict]:
         """Get user profile info using v1 (Mobile API) for stability"""

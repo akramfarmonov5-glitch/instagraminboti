@@ -93,6 +93,7 @@ def init_database():
             total_dms_today INTEGER DEFAULT 0,
             last_dm_date DATE,
             account_created_date DATE,
+            instagram_session TEXT,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
@@ -416,6 +417,29 @@ def set_account_created_date(date_str: str):
         SET account_created_date = {p}, updated_at = CURRENT_TIMESTAMP
         WHERE id = 1
     """, (date_str,))
+    conn.commit()
+    conn.close()
+
+
+def get_stored_session() -> Optional[str]:
+    """Get stored Instagram session from database"""
+    conn, _ = get_connection()
+    cursor = get_cursor(conn)
+    cursor.execute("SELECT instagram_session FROM bot_state WHERE id = 1")
+    row = cursor.fetchone()
+    conn.close()
+    return row['instagram_session'] if row else None
+
+
+def save_stored_session(session_data: str):
+    """Save Instagram session to database"""
+    conn, p = get_connection()
+    cursor = get_cursor(conn)
+    cursor.execute(f"""
+        UPDATE bot_state 
+        SET instagram_session = {p}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = 1
+    """, (session_data,))
     conn.commit()
     conn.close()
 
