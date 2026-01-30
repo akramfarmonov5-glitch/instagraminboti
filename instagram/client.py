@@ -59,6 +59,8 @@ class InstagramClient:
                 return True
             except Exception as e:
                 print(f"⚠️ Database session invalid: {e}")
+        else:
+            print("ℹ️ No session found in database storage")
 
         # 2. Try loading from Local File
         if self._load_session():
