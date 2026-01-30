@@ -100,8 +100,21 @@ def init_database():
     
     # Initialize bot state if not exists
     if is_pg:
+        # PostgreSQL Migration: Add instagram_session if missing from existing table
+        cursor.execute("SELECT column_name FROM information_schema.columns WHERE table_name='bot_state' AND column_name='instagram_session'")
+        if not cursor.fetchone():
+            print("🚀 Migrating: Adding 'instagram_session' column to Neon...")
+            cursor.execute("ALTER TABLE bot_state ADD COLUMN instagram_session TEXT")
+            
         cursor.execute("INSERT INTO bot_state (id, total_dms_today, last_dm_date) VALUES (1, 0, CURRENT_DATE) ON CONFLICT (id) DO NOTHING")
     else:
+        # SQLite Migration: Add instagram_session if missing
+        cursor.execute("PRAGMA table_info(bot_state)")
+        cols = [col[1] for col in cursor.fetchall()]
+        if 'instagram_session' not in cols:
+            print("🚀 Migrating: Adding 'instagram_session' column to SQLite...")
+            cursor.execute("ALTER TABLE bot_state ADD COLUMN instagram_session TEXT")
+            
         cursor.execute("INSERT OR IGNORE INTO bot_state (id, total_dms_today, last_dm_date) VALUES (1, 0, date('now'))")
     
     conn.commit()
