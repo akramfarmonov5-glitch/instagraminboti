@@ -47,10 +47,20 @@ class InstagramClient:
         """
         from database.models import get_stored_session, save_stored_session
         
+        from database.models import get_stored_session, save_stored_session, get_connection
+        import sqlite3
+        
+        # Check connection type for logging
+        conn, _ = get_connection()
+        is_pg = not isinstance(conn, sqlite3.Connection)
+        db_type = "PostgreSQL (Neon)" if is_pg else "SQLite (Local)"
+        conn.close()
+        
         # 1. Try Loading from Database (Highest priority for Cloud Sync)
+        print(f"📡 Checking {db_type} for session...")
         db_session = get_stored_session()
         if db_session:
-            print("📦 Found session in database, attempting to load...")
+            print(f"📦 Found session in {db_type}, attempting to load...")
             try:
                 session_data = json.loads(db_session)
                 self.client.set_settings(session_data)
@@ -60,7 +70,7 @@ class InstagramClient:
             except Exception as e:
                 print(f"⚠️ Database session invalid: {e}")
         else:
-            print("ℹ️ No session found in database storage")
+            print(f"ℹ️ No session found in {db_type} storage")
 
         # 2. Try loading from Local File
         if self._load_session():
