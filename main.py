@@ -5,9 +5,31 @@ Main entry point
 import sys
 from datetime import datetime
 
+import sys
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from config import validate_config, DATA_DIR
 from database.models import init_database, set_account_created_date
 from bot.scheduler import run_scheduler, add_leads_from_list, scrape_followers_of_user, discover_new_leads, discover_all_uzbek_businesses
+
+
+class PingHandler(BaseHTTPRequestHandler):
+    """Simple handler for keep-alive pings"""
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/html')
+        self.end_headers()
+        self.wfile.write(b"Bot is alive!")
+
+    def log_message(self, format, *args):
+        # Silent logs for pings
+        return
+
+def start_keep_alive_server(port=8080):
+    """Run a simple HTTP server in the background for UptimeRobot"""
+    server = HTTPServer(('0.0.0.0', port), PingHandler)
+    print(f"🌐 Keep-alive server started on port {port}")
+    server.serve_forever()
 
 
 def print_banner():
@@ -79,6 +101,10 @@ def main():
             discover_all_uzbek_businesses(amount)
         
         elif command == "run":
+            # Start keep-alive server in background
+            port = int(os.getenv("PORT", 8080))
+            threading.Thread(target=start_keep_alive_server, args=(port,), daemon=True).start()
+            
             # Run the scheduler
             run_scheduler()
         
