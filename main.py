@@ -6,6 +6,7 @@ import sys
 from datetime import datetime
 
 import sys
+import os
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from config import validate_config, DATA_DIR
